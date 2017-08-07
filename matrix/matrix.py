@@ -5,6 +5,11 @@ import requests
 import bs4
 import threading
 
+import sys
+import Adafruit_DHT as dht
+reload(sys)
+sys.setdefaultencoding('utf8')
+
 endChar="="
 newLine="\n"
 currentTemp="NA"
@@ -15,13 +20,15 @@ def idokepCrawl():
     while True:
         try:
             response = requests.get(url)
-            soup = bs4.BeautifulSoup(response.text,"html5lib")
+            asciiFilteredText=response.text.encode('ascii',errors='ignore')
+            soup = bs4.BeautifulSoup(asciiFilteredText,from_encoding="utf-8")
             currentTempDiv=soup.find("div",{"class":"homerseklet"})
-            currentTemp=''.join(map(str, currentTempDiv.contents))
-            currentTemp=currentTemp.replace('°','\'')
+            currentTemp=''+currentTempDiv.contents[0]
+            currentTemp=currentTemp.decode('utf-8').encode('utf-8').replace('°','').replace('C','')
             time.sleep(60*5)
-        except:
-            pass
+        except Exception as e:
+            print 'My exception occurred, value:', e
+            currentTemp="ERR"
 
 def getCurrentTime():
     return time.strftime("%H:%M", time.localtime())
@@ -37,7 +44,8 @@ idokepThread=threading.Thread(name="idokep",target=idokepCrawl)
 idokepThread.start()
 
 while True:
-    text=getCurrentDate()+' '+getCurrentTime()+newLine+currentTemp+endChar
+    h,t = dht.read_retry(dht.DHT22, 4)
+    text=getCurrentDate()+' '+getCurrentTime()+newLine+'T:'+currentTemp+'|'+str(int(round(t)))+'\'C H:'+ str(int(round(h)))+'%'+endChar
     serialPort.write(text.encode())
     serialPort.flushOutput()
     time.sleep(10)
